@@ -1061,7 +1061,7 @@ prompt_go_version() {
   go_version=$(go version 2>/dev/null | sed -E "s/.*(go[0-9.]*).*/\1/")
   go_path=$(go env GOPATH 2>/dev/null)
 
-  if [[ -n "$go_version" && "${PWD##$go_path}" != "$PWD" ]]; then
+  if [[ -n "$go_version" && "${PWD##$go_path}" != "$PWD" ]] || [[ -f "go.mod" ]]; then
     "$1_prompt_segment" "$0" "$2" "green" "grey93" "$go_version" "GO_ICON"
   fi
 }
@@ -1322,12 +1322,14 @@ prompt_root_indicator() {
 prompt_rust_version() {
   local rust_version
   rust_version=$(command rustc --version 2>/dev/null)
+
   # Remove "rustc " (including the whitespace) from the beginning
   # of the version string and remove everything after the next
   # whitespace. This way we'll end up with only the version.
+
   rust_version=${${rust_version/rustc /}%% *}
 
-  if [[ -n "$rust_version" ]]; then
+  if [[ -n "$rust_version"  && -f "Cargo.toml" ]]; then
     "$1_prompt_segment" "$0" "$2" "darkorange" "$DEFAULT_COLOR" "$rust_version" 'RUST_ICON'
   fi
 }
@@ -1513,6 +1515,84 @@ prompt_todo() {
     if [[ "$count" = <-> ]]; then
       "$1_prompt_segment" "$0" "$2" "grey50" "$DEFAULT_COLOR" "$count" 'TODO_ICON'
     fi
+  fi
+}
+
+function tw_regex {
+  gawk 'match($0,/'$1'/, ary) {print ary['${2:-'3'}']","ary['${2:-'4'}']","ary['${2:-'5'}']}';
+}
+
+function tw_dateconv() {
+    date --date=${1:0:4}-${1:4:2}-${1:6:2}T${1:9:2}:${1:11:2}:${1:13:2} +%s
+}
+
+# taskwarrior: show data from taskwarrior
+prompt_task() {
+  if $(hash task 2>&-); then
+    typeset -gAH tw_colors
+    tw_colors=(
+      'finishedall'        "green"
+      'finishedtoday'      "green"
+      'todaypending'       "$DEFAULT_COLOR_INVERTED"
+      'todayonly'          "$DEFAULT_COLOR_INVERTED"
+      'late'               "yellow"
+    )
+    local current_state=""; local today=0; local over=0; local pending=0;
+    # local data=$(task +PENDING export | tw_regex '{.*\"description\":\"([^,]*)\",\"due\":\"([^,]*)\"(,[^,]*)*,\"project\":\"([^,]*)\"(,[^,]*)*,\"status\":\"([^,]*)\",.*},?' )
+    # local data=$(task +PENDING export | tw_regex '{.*\"description\":\"([^,]*)\",.*,\"project\":\"([^,]*)\",\"status\":\"([^,]*)\",.*},?' )
+    local data=$(task +PENDING export | tw_regex '{.*\"description\":\"([^,]*)\",(\"due\":\"([^,]*)\")?.*,\"project\":\"([^,]*)\".*,\"status\":\"([^,]*)\",.*},?' )
+    
+    # split string to array of strings
+    data=(${=data})
+
+    local currentdate_seconds=$(date +"%s")
+    for line in $data ; do
+      # IFS=',' read -r duedate projectname currentstatus <<<"$line"
+      IFS=',' read -r duedate projectname currentstatus <<<"$line"
+
+      if [[ -n $duedate ]]; then
+
+        local duedate_seconds=$(tw_dateconv $duedate)
+        if [[ $(( $currentdate_seconds - $duedate_seconds )) -gt 0  ]]
+        then
+          over=$((over+1))
+        else
+          # FIXME: this checks if the date is in the next 24h period
+          if [[ $(( $duedate_seconds - $currentdate_seconds )) -lt 86400 ]]
+          then
+            today=$((today+1))
+          fi
+        fi
+      fi
+      # every task is pending
+      pending=$((pending+1))
+    done
+
+    typeset -gAH tw_messages
+    tw_messages=(
+      'finishedall'      "No pending tasks!"
+      'finishedtoday'    "$pending tasks coming up"
+      'todaypending'     "$today tasks for today and $(( $pending-$today )) coming up"
+      'todayonly'        "$today tasks for today"
+      'late'             "$over tasks late and $(( $pending-$over )) coming up"
+    )
+
+    if [[  $today -gt 0  ]]; then
+      if [[  $pending-$today -gt 0  ]]; then
+        current_state="todaypending"
+      else
+        current_state="todayonly"
+      fi
+    else
+      current_state="finishedtoday"
+    fi
+    if [[  $over -gt 0 ]]; then
+      current_state="late"
+    fi
+    if [[ $pending -eq 0 ]]; then
+      current_state="finishedall"
+    fi
+    "$1_prompt_segment" "$0" "$2" "${tw_colors[$current_state]}" "$DEFAULT_COLOR" "${tw_messages[$current_state]}" 'TODO_ICON'
   fi
 }
 
