@@ -1062,7 +1062,7 @@ prompt_go_version() {
   go_path=$(go env GOPATH 2>/dev/null)
 
   if [[ -n "$go_version" && "${PWD##$go_path}" != "$PWD" ]] || [[ -f "go.mod" ]]; then
-    "$1_prompt_segment" "$0" "$2" "green" "grey93" "$go_version" "GO_ICON"
+    "$1_prompt_segment" "$0" "$2" "green" "$DEFAULT_COLOR" "$go_version" "GO_ICON"
   fi
 }
 
@@ -1822,7 +1822,7 @@ prompt_java_version() {
   # redirect the stderr to stdout to make the pipe work).
   java_version=$(java -version 2>/dev/null && java -fullversion 2>&1 | cut -d '"' -f 2)
 
-  if [[ -n "$java_version" ]]; then
+  if [[ -n "$java_version" && (-f "build.sbt" || -f "pom.xml" || -f "build.gradle") ]]; then
     "$1_prompt_segment" "$0" "$2" "red" "white" "$java_version" "JAVA_ICON"
   fi
 }
