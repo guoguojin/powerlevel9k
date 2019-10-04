@@ -1531,16 +1531,16 @@ prompt_task() {
   if $(hash task 2>&-); then
     typeset -gAH tw_colors
     tw_colors=(
-      'finishedall'        "green"
-      'finishedtoday'      "green"
-      'todaypending'       "$DEFAULT_COLOR_INVERTED"
-      'todayonly'          "$DEFAULT_COLOR_INVERTED"
+      'finishedall'        "$DEFAULT_COLOR"
+      'finishedtoday'      "$DEFAULT_COLOR"
+      'todaypending'       "green"
+      'todayonly'          "green"
       'late'               "yellow"
     )
     local current_state=""; local today=0; local over=0; local pending=0;
-    # local data=$(task +PENDING export | tw_regex '{.*\"description\":\"([^,]*)\",\"due\":\"([^,]*)\"(,[^,]*)*,\"project\":\"([^,]*)\"(,[^,]*)*,\"status\":\"([^,]*)\",.*},?' )
-    # local data=$(task +PENDING export | tw_regex '{.*\"description\":\"([^,]*)\",.*,\"project\":\"([^,]*)\",\"status\":\"([^,]*)\",.*},?' )
-    local data=$(task +PENDING export | tw_regex '{.*\"description\":\"([^,]*)\",(\"due\":\"([^,]*)\")?.*,\"project\":\"([^,]*)\".*,\"status\":\"([^,]*)\",.*},?' )
+    # local data=$(task +PENDING export | tw_regex '{.*"description":"([^,]*)","due":"([^,]*)"(,[^,]*)*,"project":"([^,]*)"(,[^,]*)*,"status":"([^,]*)",.*},?' )
+    # local data=$(task +PENDING export | tw_regex '{.*"description":"([^,]*)",.*,"project":"([^,]*)","status":"([^,]*)",.*},?' )
+    local data=$(task +PENDING export $(task _get rc.context.$(task _get rc.context)) | tw_regex '{.*"description":"([^,]*)",("due":"([^,]*)")?.*,"project":"([^,]*)".*,"status":"([^,]*)",.*},?' )
     
     # split string to array of strings
     data=(${=data})
@@ -1570,11 +1570,11 @@ prompt_task() {
 
     typeset -gAH tw_messages
     tw_messages=(
-      'finishedall'      "No pending tasks!"
-      'finishedtoday'    "$pending tasks coming up"
-      'todaypending'     "$today tasks for today and $(( $pending-$today )) coming up"
-      'todayonly'        "$today tasks for today"
-      'late'             "$over tasks late and $(( $pending-$over )) coming up"
+      'finishedall'      ""
+      'finishedtoday'    "${pending} Pending"
+      'todaypending'     "${today} Due/$(( $pending-$today )) Pending"
+      'todayonly'        "${today}Due"
+      'late'             "${over} Late/$(( $pending-$over )) Pending"
     )
 
     if [[  $today -gt 0  ]]; then
@@ -1592,7 +1592,7 @@ prompt_task() {
     if [[ $pending -eq 0 ]]; then
       current_state="finishedall"
     fi
-    "$1_prompt_segment" "$0" "$2" "${tw_colors[$current_state]}" "$DEFAULT_COLOR" "${tw_messages[$current_state]}" 'TODO_ICON'
+    "$1_prompt_segment" "$0" "$2" "${tw_colors[$current_state]}" "$DEFAULT_COLOR_INVERTED" "${tw_messages[$current_state]}" 'TODO_ICON'
   fi
 }
 
